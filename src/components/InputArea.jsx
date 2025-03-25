@@ -10,7 +10,7 @@ const InputArea = ({ onSendMessage, isLoading }) => {
   const [cursorPosition, setCursorPosition] = useState(0);
   const inputRef = useRef(null);
   const directiveRef = useRef(null);
-  const { directives } = useDirectives();
+  const { directives, isLoading: directivesLoading, error: directivesError } = useDirectives();
 
   // Handle clicking outside directive dropdown
   useEffect(() => {
@@ -125,23 +125,31 @@ const InputArea = ({ onSendMessage, isLoading }) => {
         
         {showDirectives && (
           <div className="directive-dropdown" ref={directiveRef}>
-            {directives.map((directive) => (
-              <div 
-                key={directive.id}
-                className="directive-item"
-                onClick={() => insertDirective(directive.name)}
-              >
-                <div className="directive-icon-name">
-                  <span className="directive-icon">
-                    <IconComponent iconName={directive.icon} />
-                  </span>
-                  <span className="directive-name">@{directive.name}</span>
+            {directivesLoading ? (
+              <div className="directive-loading">Loading directives...</div>
+            ) : directivesError ? (
+              <div className="directive-error">Error loading directives: {directivesError}</div>
+            ) : directives.length === 0 ? (
+              <div className="directive-empty">No directives available</div>
+            ) : (
+              directives.map((directive) => (
+                <div 
+                  key={directive.id}
+                  className="directive-item"
+                  onClick={() => insertDirective(directive.name)}
+                >
+                  <div className="directive-icon-name">
+                    <span className="directive-icon">
+                      <IconComponent iconName={directive.icon} />
+                    </span>
+                    <span className="directive-name">@{directive.name}</span>
+                  </div>
+                  <span className="directive-description">{directive.description}</span>
                 </div>
-                <span className="directive-description">{directive.description}</span>
-              </div>
-    ))}
-  </div>
-)}
+              ))
+            )}
+          </div>
+        )}
       </div>
     </form>
   );

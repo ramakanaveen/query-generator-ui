@@ -1,15 +1,42 @@
-// src/components/ChatInterface.jsx
+// src/components/ChatInterface.jsx - Updated version
 import React, { useState, useRef, useEffect } from 'react';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import './ChatInterface.css';
+import config from '../config';
+// API endpoint constants
+const API_ENDPOINT = config.apiUrl;
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState(null);
   const messageEndRef = useRef(null);
 
-  // Simulate sending message to server and getting response
+  // Create conversation when component mounts
+  useEffect(() => {
+    const createConversation = async () => {
+      try {
+        const response = await fetch(`${API_ENDPOINT}/conversations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setConversationId(data.id);
+        }
+      } catch (error) {
+        console.error('Error creating conversation:', error);
+      }
+    };
+    
+    createConversation();
+  }, []);
+
+  // Send message to server and get response
   const handleSendMessage = async (text) => {
     // Add user message to chat
     const userMessage = {
@@ -22,33 +49,64 @@ const ChatInterface = () => {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
-    // Parse directives from the message
-    const directives = text.match(/@[A-Z]+/g) || [];
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Generate mock response based on directives
-    let queryResponse = "select from trade where date=.z.d";
-    
-    if (directives.includes('@SPOT')) {
-      queryResponse = "select top 5 from trades where date=.z.d, market=\"SPOT\"";
-    } else if (directives.includes('@STIRT')) {
-      queryResponse = "select from stirt_trades where date=.z.d";
-    } else if (directives.includes('@TITAN')) {
-      queryResponse = "select from titan_data where date=.z.d";
+    try {
+      // Send query to server
+      const response = await fetch(`${API_ENDPOINT}/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: text,
+          model: 'gemini', // Default model, could be made configurable
+          database_type: 'kdb',
+          conversation_id: conversationId
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        const botMessage = {
+          id: Date.now() + 1,
+          text: "Generated KDB/Q query:",
+          query: data.generated_query,
+          thinking: data.thinking,
+          execution_id: data.execution_id,
+          sender: 'bot',
+          timestamp: new Date().toISOString(),
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        // Handle error
+        const errorData = await response.json();
+        const botMessage = {
+          id: Date.now() + 1,
+          text: "Error generating query:",
+          query: `// Error: ${errorData.detail || 'Unknown error'}`,
+          sender: 'bot',
+          timestamp: new Date().toISOString(),
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Add error message to chat
+      const botMessage = {
+        id: Date.now() + 1,
+        text: "Error generating query:",
+        query: `// Error: ${error.message || 'Network error'}`,
+        sender: 'bot',
+        timestamp: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+    } finally {
+      setIsLoading(false);
     }
-    
-    const botMessage = {
-      id: Date.now() + 1,
-      text: "Generated KDB/Q query:",
-      query: queryResponse,
-      sender: 'bot',
-      timestamp: new Date().toISOString(),
-    };
-    
-    setMessages(prev => [...prev, botMessage]);
-    setIsLoading(false);
   };
 
   // Auto-scroll to bottom when new messages arrive

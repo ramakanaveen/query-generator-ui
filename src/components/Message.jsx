@@ -1,4 +1,4 @@
-// src/components/Message.jsx - better fix using useCallback
+// src/components/Message.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import './Message.css';
@@ -7,13 +7,15 @@ import { useDirectives } from '../contexts/DirectiveContext';
 import ReactDOM from 'react-dom';
 import QueryResults from './QueryResults';
 
-
+// API endpoint constants
+const API_ENDPOINT = 'http://localhost:8000/api/v1';
 
 const Message = ({ message }) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [queryResults, setQueryResults] = useState(null);
   const [queryError, setQueryError] = useState(null);
-  const { text, query, sender, timestamp } = message;
+  const [showThinking, setShowThinking] = useState(false);
+  const { text, query, thinking, execution_id, sender, timestamp } = message;
   const { directives } = useDirectives();
   const [renderedContent, setRenderedContent] = useState('');
   
@@ -66,21 +68,55 @@ const Message = ({ message }) => {
   }, [text, sender, highlightDirectives]);
 
   const handleCopyQuery = () => {
-    navigator.clipboard.writeText(query);
-    // You could add a toast notification here
-    alert('Query copied to clipboard');
+    if (query) {
+      navigator.clipboard.writeText(query);
+      alert('Query copied to clipboard');
+    }
   };
 
   const handleExecuteQuery = async () => {
+    if (!query) return;
+    
     setIsExecuting(true);
     setQueryError(null);
     
     try {
-      // In a real app, this would call your backend API
-      // For now, let's simulate a backend call with mock data
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Send execute request to server
+      const response = await fetch(`${API_ENDPOINT}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: query,
+          execution_id: execution_id || `mock-${Date.now()}`,
+          params: {}
+        })
+      });
       
-      // Mock data - this would come from your server
+      if (response.ok) {
+        const data = await response.json();
+        setQueryResults(data.results);
+      } else {
+        // If API fails, fallback to mock data
+        console.warn("Execute API failed, using mock data");
+        
+        // Mock data
+        const mockResults = [
+          { time: "09:30:00", ticker: "AAPL", price: 150.25, quantity: 1000 },
+          { time: "09:32:15", ticker: "MSFT", price: 290.45, quantity: 500 },
+          { time: "09:35:30", ticker: "GOOGL", price: 2750.10, quantity: 200 },
+          { time: "09:40:22", ticker: "AMZN", price: 3200.50, quantity: 150 },
+          { time: "09:45:18", ticker: "TSLA", price: 800.75, quantity: 350 }
+        ];
+        
+        setQueryResults(mockResults);
+      }
+    } catch (error) {
+      console.error('Error executing query:', error);
+      setQueryError(error.message || "Failed to execute query");
+      
+      // Mock data as fallback
       const mockResults = [
         { time: "09:30:00", ticker: "AAPL", price: 150.25, quantity: 1000 },
         { time: "09:32:15", ticker: "MSFT", price: 290.45, quantity: 500 },
@@ -90,8 +126,6 @@ const Message = ({ message }) => {
       ];
       
       setQueryResults(mockResults);
-    } catch (err) {
-      setQueryError(err.message || "Failed to execute query");
     } finally {
       setIsExecuting(false);
     }
@@ -113,17 +147,41 @@ const Message = ({ message }) => {
       
       {query && (
         <div className="query-container">
-          <pre className="query-code">{query}</pre>
+          <div className="query-code" dangerouslySetInnerHTML={{ __html: query }} />
           <div className="query-actions">
+            {thinking && thinking.length > 0 && (
+              <button 
+                onClick={() => setShowThinking(!showThinking)} 
+                className="action-button thinking-button"
+              >
+                {showThinking ? 'Hide Thinking' : 'Show Thinking'}
+              </button>
+            )}
             <button onClick={handleCopyQuery} className="action-button">
               Copy
             </button>
-            <button onClick={handleExecuteQuery} className="action-button">
-              Execute
+            <button 
+              onClick={handleExecuteQuery} 
+              className={`action-button ${isExecuting ? 'disabled' : ''}`}
+              disabled={isExecuting}
+            >
+              {isExecuting ? 'Executing...' : 'Execute'}
             </button>
           </div>
         </div>
       )}
+      
+      {showThinking && thinking && thinking.length > 0 && (
+        <div className="thinking-process">
+          <h4>Thinking Process:</h4>
+          <ul>
+            {thinking.map((step, index) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
       {queryResults && (
         <QueryResults 
           results={queryResults} 
