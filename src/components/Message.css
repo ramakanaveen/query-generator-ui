@@ -79,10 +79,19 @@
   display: flex;
   padding: 0.5rem;
   background-color: #f1f1f1;
-  justify-content: flex-end;
+  justify-content: space-between; /* Changed from flex-end to space-between */
+  align-items: center;
+}
+
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .action-button {
+  display: flex;
+  align-items: center;
   margin-left: 0.5rem;
   padding: 0.25rem 0.5rem;
   border: none;
@@ -100,6 +109,67 @@
 .action-button.disabled {
   background-color: #ccc !important;
   cursor: not-allowed;
+}
+
+/* Retry button styling */
+.retry-button {
+  background-color: #ff9800 !important;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.retry-button:hover {
+  background-color: #f57c00 !important;
+}
+
+.button-icon {
+  display: inline-flex;
+}
+
+/* Feedback button styles */
+.feedback-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.feedback-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  color: #666;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feedback-button:hover:not(:disabled) {
+  background-color: #f0f0f0;
+  border-color: #ccc;
+}
+
+.feedback-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Positive feedback button */
+.feedback-button:first-child.active {
+  border-color: #4caf50;
+  color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+/* Negative feedback button */
+.feedback-button:last-child.active {
+  border-color: #f44336;
+  color: #f44336;
+  background-color: rgba(244, 67, 54, 0.1);
 }
 
 .thinking-button {
