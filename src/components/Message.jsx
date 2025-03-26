@@ -5,7 +5,7 @@ import './Message.css';
 import * as LucideIcons from 'lucide-react';
 import { useDirectives } from '../contexts/DirectiveContext';
 import { useFeedback } from '../contexts/FeedbackContext';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client'; // Import createRoot
 import QueryResults from './QueryResults';
 import RetryForm from './RetryForm';
 import config from '../config';
@@ -66,7 +66,11 @@ const Message = ({ message, onRetry }) => {
             const Icon = LucideIcons[iconName];
             const iconElement = document.createElement('span');
             iconElement.className = 'directive-icon';
-            ReactDOM.render(<Icon size={14} />, iconElement);
+            
+            // Use createRoot instead of ReactDOM.render
+            const root = createRoot(iconElement);
+            root.render(<Icon size={14} />);
+            
             if (placeholder.parentNode) {
               placeholder.parentNode.replaceChild(iconElement, placeholder);
             }
@@ -143,12 +147,29 @@ const Message = ({ message, onRetry }) => {
   };
 
   const handleFeedback = (type) => {
-    // Use the feedback context to record feedback
-    recordFeedback(queryId, type, { originalQuery: query, originalText: text });
-    
-    // If negative feedback, show retry form
-    if (type === 'negative') {
-      setShowRetryForm(true);
+    try {
+      // Prepare feedback data
+      const feedbackData = {
+        queryId: queryId,
+        feedbackType: type,
+        originalText: text || '',
+        originalQuery: query || '',
+        conversationId: window.conversationId || null
+      };
+      
+      // Record feedback - no server sync for now, just store locally
+      recordFeedback(queryId, type, feedbackData);
+      
+      // If negative feedback, show retry form
+      if (type === 'negative') {
+        setShowRetryForm(true);
+      }
+    } catch (error) {
+      console.error("Error handling feedback:", error);
+      // Still show retry form if negative feedback
+      if (type === 'negative') {
+        setShowRetryForm(true);
+      }
     }
   };
 

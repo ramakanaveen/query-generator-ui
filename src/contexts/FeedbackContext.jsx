@@ -8,7 +8,6 @@ export const useFeedback = () => useContext(FeedbackContext);
 
 const FeedbackProvider = ({ children }) => {
   const [feedbackData, setFeedbackData] = useState({});
-  const [isPending, setIsPending] = useState(false);
   const [pendingFeedback, setPendingFeedback] = useState([]);
   const [error, setError] = useState(null);
 
@@ -43,19 +42,21 @@ const FeedbackProvider = ({ children }) => {
       [queryId]: feedbackType
     }));
 
-    // Create feedback entry with metadata
+    // Create feedback entry
     const feedback = {
       query_id: queryId,
       feedback_type: feedbackType,
-      timestamp: new Date().toISOString(),
-      ...metadata
+      original_text: metadata.originalText || '',
+      original_query: metadata.originalQuery || '',
+      timestamp: new Date().toISOString()
     };
 
-    // Add to pending queue (will be sent to server later)
+    // Add to pending queue
     setPendingFeedback(prev => [...prev, feedback]);
     
-    // For now, log to console
     console.log("Recorded feedback:", feedback);
+    
+    // We'll avoid sending to server immediately to prevent continuous errors
   };
 
   // Check if feedback exists for a query
@@ -63,58 +64,44 @@ const FeedbackProvider = ({ children }) => {
     return feedbackData[queryId] || null;
   };
 
-  // This effect would handle syncing with server
-  // Commented out for now - implement when backend is ready
-  /*
-  useEffect(() => {
-    const syncFeedbackWithServer = async () => {
-      // Only proceed if there's pending feedback and we're not already syncing
-      if (pendingFeedback.length === 0 || isPending) return;
+  // Manual sync with server (not automatic)
+  const syncFeedbackWithServer = async () => {
+    if (pendingFeedback.length === 0) {
+      return { success: true, message: "No pending feedback to sync" };
+    }
+    
+    try {
+      // Use the flexible endpoint
+      const response = await fetch(`${config.apiUrl}/feedback/flexible`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(pendingFeedback[0]) // Send just one item for now
+      });
       
-      try {
-        setIsPending(true);
-        setError(null);
-        
-        // Send feedback to server
-        const response = await fetch(`${config.apiUrl}/feedback/batch`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ feedback: pendingFeedback })
-        });
-        
-        if (response.ok) {
-          // Clear pending feedback if saved successfully
-          setPendingFeedback([]);
-        } else {
-          const errorData = await response.json();
-          setError(errorData.detail || 'Failed to save feedback');
-        }
-      } catch (error) {
-        console.error('Error saving feedback:', error);
-        setError(error.message || 'Network error');
-      } finally {
-        setIsPending(false);
+      if (response.ok) {
+        // Remove the first item from pending queue
+        setPendingFeedback(prev => prev.slice(1));
+        return { success: true, message: "Feedback synced successfully" };
+      } else {
+        const errorData = await response.json();
+        setError(errorData.detail || 'Failed to save feedback');
+        return { success: false, message: errorData.detail || 'Failed to save feedback' };
       }
-    };
-    
-    // Attempt to sync every 30 seconds or when pendingFeedback changes
-    const intervalId = setInterval(syncFeedbackWithServer, config.feedback.syncInterval);
-    
-    // Also try to sync immediately when new feedback is added
-    syncFeedbackWithServer();
-    
-    return () => clearInterval(intervalId);
-  }, [pendingFeedback, isPending]);
-  */
+    } catch (error) {
+      console.error('Error syncing feedback:', error);
+      setError(error.message || 'Network error');
+      return { success: false, message: error.message || 'Network error' };
+    }
+  };
 
   return (
     <FeedbackContext.Provider value={{ 
       recordFeedback, 
       getFeedback,
+      syncFeedbackWithServer,
       pendingCount: pendingFeedback.length,
-      isPending,
       error
     }}>
       {children}
