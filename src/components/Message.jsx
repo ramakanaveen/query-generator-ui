@@ -5,10 +5,13 @@ import './Message.css';
 import * as LucideIcons from 'lucide-react';
 import { useDirectives } from '../contexts/DirectiveContext';
 import { useFeedback } from '../contexts/FeedbackContext';
-import { createRoot } from 'react-dom/client'; // Import createRoot
+import { createRoot } from 'react-dom/client'; 
 import QueryResults from './QueryResults';
 import RetryForm from './RetryForm';
 import config from '../config';
+
+// Import markdown rendering library
+import ReactMarkdown from 'react-markdown';
 
 // API endpoint constants
 const API_ENDPOINT = config.apiUrl;
@@ -19,7 +22,7 @@ const Message = ({ message, onRetry }) => {
   const [queryError, setQueryError] = useState(null);
   const [showThinking, setShowThinking] = useState(false);
   const [showRetryForm, setShowRetryForm] = useState(false);
-  const { text, query, thinking, execution_id, sender, timestamp, id } = message;
+  const { text, query, thinking, execution_id, sender, timestamp, id, responseType } = message;
   const { directives } = useDirectives();
   const { recordFeedback, getFeedback } = useFeedback();
   const [renderedContent, setRenderedContent] = useState('');
@@ -184,6 +187,9 @@ const Message = ({ message, onRetry }) => {
     setShowRetryForm(false);
   };
 
+  // Determine if this is a schema description
+  const isSchemaDescription = responseType === "schema_description";
+
   return (
     <div className={`message ${sender}`}>
       <div className="message-header">
@@ -200,7 +206,14 @@ const Message = ({ message, onRetry }) => {
       
       {query && (
         <div className="query-container">
-          <div className="query-code" dangerouslySetInnerHTML={{ __html: query }} />
+          {isSchemaDescription ? (
+            <div className="schema-description">
+              <ReactMarkdown>{query}</ReactMarkdown>
+            </div>
+          ) : (
+            <div className="query-code" dangerouslySetInnerHTML={{ __html: query }} />
+          )}
+          
           <div className="query-actions">
             <div className="action-group">
               {thinking && thinking.length > 0 && (
@@ -211,16 +224,20 @@ const Message = ({ message, onRetry }) => {
                   {showThinking ? 'Hide Thinking' : 'Show Thinking'}
                 </button>
               )}
+              
               <button onClick={handleCopyQuery} className="action-button">
                 Copy
               </button>
-              <button 
-                onClick={handleExecuteQuery} 
-                className={`action-button ${isExecuting ? 'disabled' : ''}`}
-                disabled={isExecuting}
-              >
-                {isExecuting ? 'Executing...' : 'Execute'}
-              </button>
+              
+              {!isSchemaDescription && (
+                <button 
+                  onClick={handleExecuteQuery} 
+                  className={`action-button ${isExecuting ? 'disabled' : ''}`}
+                  disabled={isExecuting}
+                >
+                  {isExecuting ? 'Executing...' : 'Execute'}
+                </button>
+              )}
               
               {/* Show retry button if negative feedback was given */}
               {existingFeedback === 'negative' && !showRetryForm && (
@@ -279,7 +296,7 @@ const Message = ({ message, onRetry }) => {
         </div>
       )}
       
-      {queryResults && (
+      {queryResults && !isSchemaDescription && (
         <QueryResults 
           results={queryResults} 
           isLoading={isExecuting} 

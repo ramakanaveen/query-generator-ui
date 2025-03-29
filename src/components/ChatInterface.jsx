@@ -130,14 +130,22 @@ const ChatInterface = () => {
       if (response.ok) {
         const data = await response.json();
         
+        // Check response type for different kinds of responses
+        const responseType = data.response_type || "query";
+        
         const botMessage = {
           id: `msg-${Date.now() + 1}`,
-          text: "Generated KDB/Q query:",
-          query: data.generated_query,
+          text: responseType === "schema_description" 
+                ? "Schema Information:" 
+                : "Generated KDB/Q query:",
+          query: responseType === "schema_description" 
+                ? data.generated_content 
+                : data.generated_query,
           thinking: data.thinking,
           execution_id: data.execution_id,
           sender: 'bot',
           timestamp: new Date().toISOString(),
+          responseType: responseType  // Store the response type
         };
         
         setMessages(prev => [...prev, botMessage]);

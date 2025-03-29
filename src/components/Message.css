@@ -3,8 +3,9 @@
   margin-bottom: 1rem;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  max-width: 80%;
+  max-width: 90%; /* Increased from 80% */
 }
+
 
 .message.user {
   align-self: flex-end;
@@ -75,6 +76,101 @@
   word-break: break-word;
 }
 
+/* Schema description styling */
+.schema-description {
+  padding: 1rem;
+  margin: 0;
+  background-color: white;
+  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  width: 100%; /* Ensure it uses full width */
+}
+
+
+
+
+/* Add specific styling for markdown elements in schema description */
+.schema-description h1, 
+.schema-description h2, 
+.schema-description h3, 
+.schema-description h4 {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: #0277bd;
+}
+
+.schema-description h1 {
+  font-size: 1.5rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.3rem;
+}
+
+.schema-description h2 {
+  font-size: 1.3rem;
+}
+
+.schema-description h3 {
+  font-size: 1.1rem;
+}
+
+.schema-description p {
+  margin-bottom: 0.75rem;
+}
+
+.schema-description ul, 
+.schema-description ol {
+  margin-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.schema-description li {
+  margin-bottom: 0.25rem;
+}
+
+.schema-description code {
+  background-color: #f0f0f0;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.schema-description pre {
+  overflow-x: auto;
+}
+
+/* Make tables in schema descriptions scroll horizontally if needed */
+.schema-description table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+
+.schema-description th,
+.schema-description td {
+  white-space: normal;
+  padding: 0.5rem;
+}
+
+.schema-description th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+/* allow table cells to wrap text when needed */
+.schema-description td {
+  white-space: normal;
+}
 .query-actions {
   display: flex;
   padding: 0.5rem;
