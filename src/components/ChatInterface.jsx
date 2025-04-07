@@ -2,8 +2,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
+import ConversationSidebar from './ConversationSidebar';
 import './ChatInterface.css';
 import config from '../config';
+import * as LucideIcons from 'lucide-react';
 
 // API endpoint constants
 const API_ENDPOINT = config.apiUrl;
@@ -13,32 +15,24 @@ const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const messageEndRef = useRef(null);
-
+  
+  // New state variables for conversation management
+  const [userId, setUserId] = useState('naveen'); // Default user for testing
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [isFetchingConversation, setIsFetchingConversation] = useState(false);
+  
   // Create conversation when component mounts
   useEffect(() => {
-    const createConversation = async () => {
-      try {
-        const response = await fetch(`${API_ENDPOINT}/conversations`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Conversation created:", data);
-          
-          // Store the conversation ID
-          setConversationId(data.id);
-          window.conversationId = data.id;
-        }
-      } catch (error) {
-        console.error('Error creating conversation:', error);
-      }
-    };
+    // Check if we have a stored conversation ID
+    const storedConversationId = localStorage.getItem('currentConversationId');
     
-    createConversation();
+    if (storedConversationId) {
+      // Try to load the stored conversation
+      loadConversation(storedConversationId);
+    } else {
+      // Create a new conversation
+      createConversation();
+    }
   }, []);
 
   // Helper to format messages for the API - Keep this very simple
@@ -88,6 +82,104 @@ const ChatInterface = () => {
       return { success: false, error: error.message };
     }
   };
+  
+  // Create a new conversation
+  const createConversation = async () => {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: userId
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Conversation created:", data);
+        
+        // Store the conversation ID
+        setConversationId(data.id);
+        localStorage.setItem('currentConversationId', data.id);
+        window.conversationId = data.id;
+        
+        // Clear messages for the new conversation
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+    }
+  };
+  
+  // Load an existing conversation
+  const loadConversation = async (id) => {
+    setIsFetchingConversation(true);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/conversations/${id}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Conversation loaded:", data);
+        
+        // Store the conversation ID
+        setConversationId(data.id);
+        localStorage.setItem('currentConversationId', data.id);
+        window.conversationId = data.id;
+        
+        // Load messages from the conversation
+        if (data.messages && Array.isArray(data.messages)) {
+          const formattedMessages = data.messages.map(msg => ({
+            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+            text: msg.role === 'user' ? msg.content : 'Generated KDB/Q query:',
+            query: msg.role === 'assistant' ? msg.content : null,
+            sender: msg.role === 'user' ? 'user' : 'bot',
+            timestamp: msg.timestamp || new Date().toISOString()
+          }));
+          
+          setMessages(formattedMessages);
+        } else {
+          setMessages([]);
+        }
+        
+        // Update the conversation in our server for last_accessed_at
+        await fetch(`${API_ENDPOINT}/conversations/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({})  // Empty update just to refresh last_accessed_at
+        });
+      } else if (response.status === 404) {
+        // Conversation not found, create a new one
+        console.warn("Conversation not found, creating new one");
+        createConversation();
+      } else {
+        console.error("Error loading conversation");
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    } finally {
+      setIsFetchingConversation(false);
+    }
+  };
+  
+  // Handle conversation selection from sidebar
+  const handleConversationSelect = (id) => {
+    if (id === conversationId) return; // Already selected
+    loadConversation(id);
+  };
+  
+  // Handle creating a new conversation
+  const handleNewConversation = () => {
+    createConversation();
+  };
+  
+  // Toggle sidebar visibility
+  const toggleSidebar = () => {
+    setShowSidebar(!showSidebar);
+  };
 
   // Send message to server and get response
   const handleSendMessage = async (text) => {
@@ -103,6 +195,24 @@ const ChatInterface = () => {
     setIsLoading(true);
     
     try {
+      // Get conversation summary if we have enough messages
+      let conversationSummary = "";
+      if (messages.length >= 3) {
+        try {
+          // Get summary from backend
+          const summaryResponse = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/summary`, {
+            method: 'GET'
+          });
+          
+          if (summaryResponse.ok) {
+            const summaryData = await summaryResponse.json();
+            conversationSummary = summaryData.summary;
+          }
+        } catch (error) {
+          console.warn("Error getting conversation summary:", error);
+        }
+      }
+      
       // Collect all previous messages
       const allMessages = [...messages, userMessage];
       
@@ -123,7 +233,9 @@ const ChatInterface = () => {
           model: 'gemini',
           database_type: 'kdb',
           conversation_id: conversationId,
-          conversation_history: historyMessages
+          conversation_history: historyMessages,
+          conversation_summary: conversationSummary,
+          user_id: userId
         })
       });
       
@@ -219,6 +331,21 @@ const ChatInterface = () => {
     setIsLoading(true);
     
     try {
+      // Get conversation summary
+      let conversationSummary = "";
+      try {
+        const summaryResponse = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/summary`, {
+          method: 'GET'
+        });
+        
+        if (summaryResponse.ok) {
+          const summaryData = await summaryResponse.json();
+          conversationSummary = summaryData.summary;
+        }
+      } catch (error) {
+        console.warn("Error getting conversation summary:", error);
+      }
+      
       // Collect all previous messages
       const allMessages = [...messages, userMessage];
       
@@ -239,7 +366,9 @@ const ChatInterface = () => {
           model: 'gemini',
           database_type: 'kdb',
           conversation_id: conversationId,
-          conversation_history: historyMessages
+          conversation_history: historyMessages,
+          conversation_summary: conversationSummary,
+          user_id: userId
         })
       });
       
@@ -322,10 +451,39 @@ const ChatInterface = () => {
   }, [messages]);
 
   return (
-    <div className="chat-interface">
-      <MessageList messages={messages} onRetry={handleRetry} />
-      <div ref={messageEndRef} />
-      <InputArea onSendMessage={handleSendMessage} isLoading={isLoading} />
+    <div className={`chat-interface ${showSidebar ? 'with-sidebar' : ''}`}>
+      {showSidebar && (
+        <ConversationSidebar
+          userId={userId}
+          currentConversationId={conversationId}
+          onConversationSelect={handleConversationSelect}
+          onNewConversation={handleNewConversation}
+        />
+      )}
+      
+      <div className="chat-main">
+        <div className="chat-header">
+          <button className="sidebar-toggle" onClick={toggleSidebar}>
+            {showSidebar ? <LucideIcons.PanelLeftClose size={20} /> : <LucideIcons.PanelLeftOpen size={20} />}
+          </button>
+          <h2>QConnect</h2>
+        </div>
+        
+        {isFetchingConversation ? (
+          <div className="loading-conversation">Loading conversation...</div>
+        ) : (
+          <>
+            <MessageList 
+              messages={messages} 
+              onRetry={handleRetry} 
+              userId={userId}
+              conversationId={conversationId}
+            />
+            <div ref={messageEndRef} />
+            <InputArea onSendMessage={handleSendMessage} isLoading={isLoading} />
+          </>
+        )}
+      </div>
     </div>
   );
 };
