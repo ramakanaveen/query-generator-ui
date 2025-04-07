@@ -25,6 +25,13 @@ const config = {
     // Feature flags
     enableMockResponses: true,  // Fall back to mock responses if API fails
     enableDirectives: true,     // Enable directive suggestions
+    
+    // Feedback settings
+    feedback: {
+      enableFeedback: true,     // Enable feedback functionality
+      syncInterval: 30000,      // Sync interval in milliseconds (30 seconds)
+      storageKey: 'qconnect_feedback_cache' // Local storage key for persisting feedback
+    }
   };
   
   export default config;

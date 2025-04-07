@@ -3,6 +3,7 @@ import React from 'react';
 import './App.css';
 import ChatInterface from './components/ChatInterface';
 import DirectiveProvider from './contexts/DirectiveContext';
+import FeedbackProvider from './contexts/FeedbackContext';
 
 function App() {
   return (
@@ -12,7 +13,9 @@ function App() {
       </header>
       <main>
         <DirectiveProvider>
-          <ChatInterface />
+          <FeedbackProvider>
+            <ChatInterface />
+          </FeedbackProvider>
         </DirectiveProvider>
       </main>
       <footer>

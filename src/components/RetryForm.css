@@ -1,0 +1,92 @@
+/* src/components/RetryForm.css */
+.retry-form {
+    margin-top: 0.5rem;
+    padding: 1rem;
+    background-color: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+  }
+  
+  .retry-form h4 {
+    display: flex;
+    align-items: center;
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    color: #555;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+  
+  .form-icon {
+    margin-right: 0.5rem;
+    color: #f57c00;
+  }
+  
+  .retry-instructions {
+    font-size: 0.85rem;
+    color: #555;
+    margin-bottom: 0.75rem;
+  }
+  
+  .retry-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+    resize: vertical;
+    font-family: inherit;
+    margin-bottom: 0.75rem;
+  }
+  
+  .retry-textarea:focus {
+    outline: none;
+    border-color: #0277bd;
+    box-shadow: 0 0 0 2px rgba(2, 119, 189, 0.1);
+  }
+  
+  .retry-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  
+  .retry-cancel-button {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ddd;
+    background-color: #f8f8f8;
+    color: #555;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  
+  .retry-cancel-button:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .retry-submit-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background-color: #0277bd;
+    color: white;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  
+  .retry-submit-button:hover:not(:disabled) {
+    background-color: #01579b;
+  }
+  
+  .retry-submit-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .button-icon {
+    display: inline-flex;
+  }

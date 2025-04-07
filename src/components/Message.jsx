@@ -4,20 +4,34 @@ import { formatDistanceToNow } from 'date-fns';
 import './Message.css';
 import * as LucideIcons from 'lucide-react';
 import { useDirectives } from '../contexts/DirectiveContext';
-import ReactDOM from 'react-dom';
+import { useFeedback } from '../contexts/FeedbackContext';
+import { createRoot } from 'react-dom/client'; 
 import QueryResults from './QueryResults';
+import RetryForm from './RetryForm';
+import config from '../config';
+
+// Import markdown rendering library
+import ReactMarkdown from 'react-markdown';
 
 // API endpoint constants
-const API_ENDPOINT = 'http://localhost:8000/api/v1';
+const API_ENDPOINT = config.apiUrl;
 
-const Message = ({ message }) => {
+const Message = ({ message, onRetry }) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [queryResults, setQueryResults] = useState(null);
   const [queryError, setQueryError] = useState(null);
   const [showThinking, setShowThinking] = useState(false);
-  const { text, query, thinking, execution_id, sender, timestamp } = message;
+  const [showRetryForm, setShowRetryForm] = useState(false);
+  const { text, query, thinking, execution_id, sender, timestamp, id, responseType } = message;
   const { directives } = useDirectives();
+  const { recordFeedback, getFeedback } = useFeedback();
   const [renderedContent, setRenderedContent] = useState('');
+  
+  // Get query ID for feedback
+  const queryId = id || execution_id || `query-${Date.now()}`;
+  
+  // Get existing feedback if any
+  const existingFeedback = getFeedback(queryId);
   
   // Format the timestamp
   const timeAgo = formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -55,7 +69,11 @@ const Message = ({ message }) => {
             const Icon = LucideIcons[iconName];
             const iconElement = document.createElement('span');
             iconElement.className = 'directive-icon';
-            ReactDOM.render(<Icon size={14} />, iconElement);
+            
+            // Use createRoot instead of ReactDOM.render
+            const root = createRoot(iconElement);
+            root.render(<Icon size={14} />);
+            
             if (placeholder.parentNode) {
               placeholder.parentNode.replaceChild(iconElement, placeholder);
             }
@@ -131,6 +149,47 @@ const Message = ({ message }) => {
     }
   };
 
+  const handleFeedback = (type) => {
+    try {
+      // Prepare feedback data
+      const feedbackData = {
+        queryId: queryId,
+        feedbackType: type,
+        originalText: text || '',
+        originalQuery: query || '',
+        conversationId: window.conversationId || null
+      };
+      
+      // Record feedback - no server sync for now, just store locally
+      recordFeedback(queryId, type, feedbackData);
+      
+      // If negative feedback, show retry form
+      if (type === 'negative') {
+        setShowRetryForm(true);
+      }
+    } catch (error) {
+      console.error("Error handling feedback:", error);
+      // Still show retry form if negative feedback
+      if (type === 'negative') {
+        setShowRetryForm(true);
+      }
+    }
+  };
+
+  const handleRetry = (feedbackText) => {
+    if (onRetry) {
+      onRetry(text, query, feedbackText);
+    }
+    setShowRetryForm(false);
+  };
+
+  const handleCancelRetry = () => {
+    setShowRetryForm(false);
+  };
+
+  // Determine if this is a schema description
+  const isSchemaDescription = responseType === "schema_description";
+
   return (
     <div className={`message ${sender}`}>
       <div className="message-header">
@@ -147,28 +206,83 @@ const Message = ({ message }) => {
       
       {query && (
         <div className="query-container">
-          <div className="query-code" dangerouslySetInnerHTML={{ __html: query }} />
+          {isSchemaDescription ? (
+            <div className="schema-description">
+              <ReactMarkdown>{query}</ReactMarkdown>
+            </div>
+          ) : (
+            <div className="query-code" dangerouslySetInnerHTML={{ __html: query }} />
+          )}
+          
           <div className="query-actions">
-            {thinking && thinking.length > 0 && (
-              <button 
-                onClick={() => setShowThinking(!showThinking)} 
-                className="action-button thinking-button"
-              >
-                {showThinking ? 'Hide Thinking' : 'Show Thinking'}
+            <div className="action-group">
+              {thinking && thinking.length > 0 && (
+                <button 
+                  onClick={() => setShowThinking(!showThinking)} 
+                  className="action-button thinking-button"
+                >
+                  {showThinking ? 'Hide Thinking' : 'Show Thinking'}
+                </button>
+              )}
+              
+              <button onClick={handleCopyQuery} className="action-button">
+                Copy
               </button>
+              
+              {!isSchemaDescription && (
+                <button 
+                  onClick={handleExecuteQuery} 
+                  className={`action-button ${isExecuting ? 'disabled' : ''}`}
+                  disabled={isExecuting}
+                >
+                  {isExecuting ? 'Executing...' : 'Execute'}
+                </button>
+              )}
+              
+              {/* Show retry button if negative feedback was given */}
+              {existingFeedback === 'negative' && !showRetryForm && (
+                <button 
+                  onClick={() => setShowRetryForm(true)} 
+                  className="action-button retry-button"
+                >
+                  <LucideIcons.RefreshCw size={14} className="button-icon" />
+                  Retry
+                </button>
+              )}
+            </div>
+            
+            {/* Feedback buttons - only show for bot messages */}
+            {sender === 'bot' && (
+              <div className="feedback-buttons">
+                <button 
+                  onClick={() => handleFeedback('positive')}
+                  className={`feedback-button ${existingFeedback === 'positive' ? 'active' : ''}`}
+                  disabled={existingFeedback !== null}
+                  title="This query is helpful"
+                >
+                  <LucideIcons.ThumbsUp size={16} />
+                </button>
+                <button 
+                  onClick={() => handleFeedback('negative')}
+                  className={`feedback-button ${existingFeedback === 'negative' ? 'active' : ''}`}
+                  disabled={existingFeedback !== null}
+                  title="This query needs improvement"
+                >
+                  <LucideIcons.ThumbsDown size={16} />
+                </button>
+              </div>
             )}
-            <button onClick={handleCopyQuery} className="action-button">
-              Copy
-            </button>
-            <button 
-              onClick={handleExecuteQuery} 
-              className={`action-button ${isExecuting ? 'disabled' : ''}`}
-              disabled={isExecuting}
-            >
-              {isExecuting ? 'Executing...' : 'Execute'}
-            </button>
           </div>
         </div>
+      )}
+      
+      {/* Retry form that appears when user gives negative feedback */}
+      {showRetryForm && (
+        <RetryForm 
+          onSubmit={handleRetry} 
+          onCancel={handleCancelRetry}
+          originalQuery={query}
+        />
       )}
       
       {showThinking && thinking && thinking.length > 0 && (
@@ -182,7 +296,7 @@ const Message = ({ message }) => {
         </div>
       )}
       
-      {queryResults && (
+      {queryResults && !isSchemaDescription && (
         <QueryResults 
           results={queryResults} 
           isLoading={isExecuting} 
