@@ -1,5 +1,4 @@
-// src/components/ChatInterface.jsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ConversationSidebar from './ConversationSidebar';
@@ -16,29 +15,13 @@ const ChatInterface = () => {
   const [conversationId, setConversationId] = useState(null);
   const messageEndRef = useRef(null);
   const [shouldStartNewConversation, setShouldStartNewConversation] = useState(true);
-
-  // New state variables for conversation management
-  const [userId, setUserId] = useState('naveen'); // Default user for testing
   const [showSidebar, setShowSidebar] = useState(true);
   const [isFetchingConversation, setIsFetchingConversation] = useState(false);
-  
-  // Create conversation when component mounts
-  useEffect(() => {
-    // Check if we have a stored conversation ID
-    const storedConversationId = localStorage.getItem('currentConversationId');
-    
-    if (storedConversationId && !shouldStartNewConversation) {
-      // Try to load the stored conversation
-      loadConversation(storedConversationId);
-    } else {
-      // Create a new conversation
-      createConversation();
-      setShouldStartNewConversation(false);
-    }
-  }, [shouldStartNewConversation]);
+  const isInitialized = useRef(false);
+  const userId = 'naveen'; // Use constant instead of state since we don't change it
 
-  // Helper to format messages for the API - Keep this very simple
-  const formatMessagesForAPI = (messages) => {
+  // Helper to format messages for the API
+  const formatMessagesForAPI = useCallback((messages) => {
     const formattedMessages = [];
     
     for (const msg of messages) {
@@ -56,9 +39,172 @@ const ChatInterface = () => {
     }
     
     return formattedMessages;
+  }, []);
+
+  // Define createConversation before using it
+  const createConversation = useCallback(async () => {
+    try {
+      // Check if we already have an active conversation
+      if (conversationId) {
+        console.log('Conversation already exists:', conversationId);
+        return;
+      }
+
+      const payload = {
+        user_id: userId,
+        title: `New Conversation ${new Date().toLocaleString()}`,
+        metadata: {
+          created_by: userId
+        }
+      };
+
+      console.log('Creating conversation with payload:', payload);
+
+      const response = await fetch(`${API_ENDPOINT}/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Conversation created:", data);
+        
+        setConversationId(data.id);
+        localStorage.setItem('currentConversationId', data.id);
+        window.conversationId = data.id;
+        
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+    }
+  }, [userId, conversationId]);
+
+  // Define loadConversation with useCallback
+  const loadConversation = useCallback(async (id) => {
+    setIsFetchingConversation(true);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/conversations/${id}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Conversation loaded:", data);
+        
+        setConversationId(data.id);
+        localStorage.setItem('currentConversationId', data.id);
+        window.conversationId = data.id;
+        
+        if (data.messages && Array.isArray(data.messages)) {
+          const formattedMessages = data.messages.map(msg => ({
+            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+            text: msg.role === 'user' ? msg.content : 'Generated KDB/Q query:',
+            query: msg.role === 'assistant' ? msg.content : null,
+            sender: msg.role === 'user' ? 'user' : 'bot',
+            timestamp: msg.timestamp || new Date().toISOString()
+          }));
+          
+          setMessages(formattedMessages);
+        }
+      } else if (response.status === 404) {
+        console.warn("Conversation not found, creating new one");
+        await createConversation();
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    } finally {
+      setIsFetchingConversation(false);
+    }
+  }, [createConversation]);
+
+  // Initialize conversation
+  useEffect(() => {
+    const initializeConversation = async () => {
+      if (isInitialized.current) {
+        return;
+      }
+      
+      isInitialized.current = true;
+      const storedConversationId = localStorage.getItem('currentConversationId');
+      
+      if (storedConversationId && !shouldStartNewConversation) {
+        console.log('Loading stored conversation:', storedConversationId);
+        try {
+          const response = await fetch(`${API_ENDPOINT}/conversations/${storedConversationId}`);
+          if (response.ok) {
+            await loadConversation(storedConversationId);
+          } else {
+            console.log('Stored conversation not found, creating new one');
+            await createConversation();
+            setShouldStartNewConversation(false);
+          }
+        } catch (error) {
+          console.error('Error checking stored conversation:', error);
+          await createConversation();
+          setShouldStartNewConversation(false);
+        }
+      } else {
+        console.log('Creating new conversation');
+        await createConversation();
+        setShouldStartNewConversation(false);
+      }
+    };
+
+    initializeConversation();
+  }, [shouldStartNewConversation, loadConversation, createConversation]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleNewConversation = async () => {
+    try {
+      isInitialized.current = false;
+      setMessages([]);
+      setShouldStartNewConversation(true);
+      
+      const response = await fetch(`${API_ENDPOINT}/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          title: `New Conversation ${new Date().toLocaleString()}`,
+          metadata: {
+            created_by: userId
+          }
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setConversationId(data.id);
+        localStorage.setItem('currentConversationId', data.id);
+        window.conversationId = data.id;
+        setShouldStartNewConversation(false);
+        console.log('New conversation created:', data.id);
+      } else {
+        console.error('Failed to create new conversation');
+      }
+    } catch (error) {
+      console.error('Error creating new conversation:', error);
+    }
   };
 
-  // Helper to save a message to the conversation
+  const handleConversationSelect = useCallback((id) => {
+    if (id === conversationId) return;
+    loadConversation(id);
+  }, [conversationId, loadConversation]);
+
+  const toggleSidebar = () => {
+    setShowSidebar(!showSidebar);
+  };
+
+  // Save message to conversation
   const saveMessageToConversation = async (messageData) => {
     if (!conversationId) {
       return { success: false, error: "No conversation ID" };
@@ -69,8 +215,6 @@ const ChatInterface = () => {
         id: messageData.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         role: messageData.role,
         content: messageData.content,
-        // timestamp will default on server
-        // metadata is optional
       };
 
       const response = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/messages`, {
@@ -92,141 +236,8 @@ const ChatInterface = () => {
       return { success: false, error: error.message };
     }
   };
-  
-  // Create a new conversation
-  const createConversation = async () => {
-    try {
-      const response = await fetch(`${API_ENDPOINT}/conversations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_id: userId
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Conversation created:", data);
-        
-        // Store the conversation ID
-        setConversationId(data.id);
-        localStorage.setItem('currentConversationId', data.id);
-        window.conversationId = data.id;
-        
-        // Clear messages for the new conversation
-        setMessages([]);
-      }
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-    }
-  };
-  
-  // Load an existing conversation
-  const loadConversation = async (id) => {
-    setIsFetchingConversation(true);
-    try {
-      const response = await fetch(`${API_ENDPOINT}/conversations/${id}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Conversation loaded:", data);
-        
-        // Store the conversation ID
-        setConversationId(data.id);
-        localStorage.setItem('currentConversationId', data.id);
-        window.conversationId = data.id;
-        
-        // Load messages from the conversation
-        if (data.messages && Array.isArray(data.messages)) {
-          const formattedMessages = data.messages.map(msg => ({
-            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-            text: msg.role === 'user' ? msg.content : 'Generated KDB/Q query:',
-            query: msg.role === 'assistant' ? msg.content : null,
-            sender: msg.role === 'user' ? 'user' : 'bot',
-            timestamp: msg.timestamp || new Date().toISOString()
-          }));
-          
-          setMessages(formattedMessages);
-        } else {
-          setMessages([]);
-        }
-        
-        // Update the conversation in our server for last_accessed_at
-        await fetch(`${API_ENDPOINT}/conversations/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({})  // Empty update just to refresh last_accessed_at
-        });
-      } else if (response.status === 404) {
-        // Conversation not found, create a new one
-        console.warn("Conversation not found, creating new one");
-        createConversation();
-      } else {
-        console.error("Error loading conversation");
-      }
-    } catch (error) {
-      console.error('Error loading conversation:', error);
-    } finally {
-      setIsFetchingConversation(false);
-    }
-  };
-  
-  // Handle conversation selection from sidebar
-  const handleConversationSelect = (id) => {
-    if (id === conversationId) return; // Already selected
-    loadConversation(id);
-  };
-  
-  // Handle creating a new conversation
-  const handleNewConversation = async () => {
-    // First update the current conversation title if it doesn't have one
-    if (conversationId && messages.length > 0) {
-      try {
-        // Generate a title from the first user message
-        const firstUserMessage = messages.find(msg => msg.sender === 'user');
-        let title = firstUserMessage ? firstUserMessage.text : "Untitled Conversation";
-        
-        // Limit title length
-        if (title.length > 50) {
-          title = title.substring(0, 47) + '...';
-        }
-        
-        // Update the conversation
-        await fetch(`${API_ENDPOINT}/conversations/${conversationId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            title: title,
-          })
-        });
-        
-        console.log(`Updated title for conversation ${conversationId}`);
-      } catch (error) {
-        console.warn('Failed to update conversation title:', error);
-      }
-    }
-    
-    // Set flag to create new conversation on next render cycle
-    setShouldStartNewConversation(true);
-    
-    // Clear messages immediately for better UX
-    setMessages([]);
-  };
-  
-  // Toggle sidebar visibility
-  const toggleSidebar = () => {
-    setShowSidebar(!showSidebar);
-  };
 
-  // Send message to server and get response
   const handleSendMessage = async (text) => {
-    // Add user message to chat
     const userMessage = {
       id: `msg-${Date.now()}`,
       text,
@@ -238,15 +249,11 @@ const ChatInterface = () => {
     setIsLoading(true);
     
     try {
-      // Get conversation summary if we have enough messages
+      // Get conversation summary if needed
       let conversationSummary = "";
       if (messages.length >= 3) {
         try {
-          // Get summary from backend
-          const summaryResponse = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/summary`, {
-            method: 'GET'
-          });
-          
+          const summaryResponse = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/summary`);
           if (summaryResponse.ok) {
             const summaryData = await summaryResponse.json();
             conversationSummary = summaryData.summary;
@@ -255,17 +262,28 @@ const ChatInterface = () => {
           console.warn("Error getting conversation summary:", error);
         }
       }
+
+      // Update conversation title if this is the first message
+      if (messages.length === 0) {
+        try {
+          await fetch(`${API_ENDPOINT}/conversations/${conversationId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              title: text.slice(0, 50)
+            })
+          });
+        } catch (error) {
+          console.warn('Failed to update conversation title:', error);
+        }
+      }
       
-      // Collect all previous messages
       const allMessages = [...messages, userMessage];
-      
-      // Format the last 5 messages only
       const recentMessages = allMessages.slice(-5);
       const historyMessages = formatMessagesForAPI(recentMessages);
       
-      console.log("Sending conversation history:", JSON.stringify(historyMessages));
-      
-      // Send query to server
       const response = await fetch(`${API_ENDPOINT}/query`, {
         method: 'POST',
         headers: {
@@ -284,37 +302,28 @@ const ChatInterface = () => {
       
       if (response.ok) {
         const data = await response.json();
-        
-        // Check response type for different kinds of responses
         const responseType = data.response_type || "query";
         
         const botMessage = {
           id: `msg-${Date.now() + 1}`,
-          text: responseType === "schema_description" 
-                ? "Schema Information:" 
-                : "Generated KDB/Q query:",
-          query: responseType === "schema_description" 
-                ? data.generated_content 
-                : data.generated_query,
+          text: responseType === "schema_description" ? "Schema Information:" : "Generated KDB/Q query:",
+          query: responseType === "schema_description" ? data.generated_content : data.generated_query,
           thinking: data.thinking,
           execution_id: data.execution_id,
           sender: 'bot',
           timestamp: new Date().toISOString(),
-          responseType: responseType  // Store the response type
+          responseType: responseType
         };
         
         setMessages(prev => [...prev, botMessage]);
         
-        // Save messages to conversation history with better error handling
         if (conversationId) {
-          // Save user message - only using minimal required fields
           await saveMessageToConversation({
             id: userMessage.id,
             role: 'user',
             content: userMessage.text
           });
           
-          // Save bot message - only using minimal required fields
           await saveMessageToConversation({
             id: botMessage.id,
             role: 'assistant',
@@ -322,10 +331,7 @@ const ChatInterface = () => {
           });
         }
       } else {
-        // Handle error
         const errorText = await response.text();
-        console.error("Error response:", errorText);
-        
         let errorMessage = "Unknown error";
         try {
           const errorData = JSON.parse(errorText);
@@ -347,7 +353,6 @@ const ChatInterface = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Add error message to chat
       const botMessage = {
         id: `msg-${Date.now() + 1}`,
         text: "Error generating query:",
@@ -362,9 +367,7 @@ const ChatInterface = () => {
     }
   };
 
-  // Handle retry request
   const handleRetry = async (originalText, originalQuery, feedbackText) => {
-    // Add user message to chat with the feedback
     const userMessage = {
       id: `msg-${Date.now()}`,
       text: `Can you fix this query? ${feedbackText}`,
@@ -376,13 +379,9 @@ const ChatInterface = () => {
     setIsLoading(true);
     
     try {
-      // Get conversation summary
       let conversationSummary = "";
       try {
-        const summaryResponse = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/summary`, {
-          method: 'GET'
-        });
-        
+        const summaryResponse = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/summary`);
         if (summaryResponse.ok) {
           const summaryData = await summaryResponse.json();
           conversationSummary = summaryData.summary;
@@ -391,14 +390,10 @@ const ChatInterface = () => {
         console.warn("Error getting conversation summary:", error);
       }
       
-      // Collect all previous messages
       const allMessages = [...messages, userMessage];
-      
-      // Format the last 5 messages only
       const recentMessages = allMessages.slice(-5);
       const historyMessages = formatMessagesForAPI(recentMessages);
       
-      // Send retry request to server
       const response = await fetch(`${API_ENDPOINT}/retry`, {
         method: 'POST',
         headers: {
@@ -432,25 +427,19 @@ const ChatInterface = () => {
         
         setMessages(prev => [...prev, botMessage]);
         
-        // Save messages to conversation history with better error handling
         if (conversationId) {
-          // Save user message - only using minimal required fields
           await saveMessageToConversation({
             role: 'user',
             content: userMessage.text
           });
           
-          // Save bot message - only using minimal required fields
           await saveMessageToConversation({
             role: 'assistant',
             content: botMessage.query
           });
         }
       } else {
-        // Handle error
         const errorText = await response.text();
-        console.error("Error response:", errorText);
-        
         let errorMessage = "Unknown error";
         try {
           const errorData = JSON.parse(errorText);
@@ -472,14 +461,10 @@ const ChatInterface = () => {
     } catch (error) {
       console.error('Error sending retry request:', error);
       
-      // Fall back to mock improved query for demo purposes
-      const mockImprovedQuery = `// Improved query based on feedback: "${feedbackText}"\n` +
-        (originalQuery ? originalQuery.replace('select', 'select distinct') : '// No original query available');
-      
       const botMessage = {
         id: `msg-${Date.now() + 1}`,
         text: "Improved KDB/Q query (mock):",
-        query: mockImprovedQuery,
+        query: `// Error generating improved query: ${error.message}`,
         sender: 'bot',
         timestamp: new Date().toISOString(),
       };
@@ -489,11 +474,6 @@ const ChatInterface = () => {
       setIsLoading(false);
     }
   };
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   return (
     <div className={`chat-interface ${showSidebar ? 'with-sidebar' : ''}`}>

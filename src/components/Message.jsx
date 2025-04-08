@@ -155,7 +155,7 @@ const Message = ({ message, onRetry, userId, conversationId }) => {
       const feedbackData = {
         query_id: queryId,
         user_id: userId || 'anonymous',
-        original_query: text || '',
+        original_query: text.startsWith("Generated KDB/Q query:") ? null : text, // Fix for user message text
         generated_query: query || '',
         conversation_id: conversationId || window.conversationId || null,
         feedback_type: type,
@@ -171,6 +171,20 @@ const Message = ({ message, onRetry, userId, conversationId }) => {
         const endpoint = `${API_ENDPOINT}/feedback/positive`;
         console.log("Sending positive feedback to:", endpoint, feedbackData);
         
+        // Look up the original user query from the message list
+        const messages = document.querySelectorAll('.message');
+        let originalUserQuery = null;
+        messages.forEach(msg => {
+          if (msg.querySelector('.sender')?.textContent === 'You') {
+            originalUserQuery = msg.querySelector('.message-content')?.textContent;
+          }
+        });
+  
+        // Update feedbackData with the correct original query
+        if (originalUserQuery) {
+          feedbackData.original_query = originalUserQuery;
+        }
+  
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
