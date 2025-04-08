@@ -15,7 +15,8 @@ const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const messageEndRef = useRef(null);
-  
+  const [shouldStartNewConversation, setShouldStartNewConversation] = useState(true);
+
   // New state variables for conversation management
   const [userId, setUserId] = useState('naveen'); // Default user for testing
   const [showSidebar, setShowSidebar] = useState(true);
@@ -26,14 +27,15 @@ const ChatInterface = () => {
     // Check if we have a stored conversation ID
     const storedConversationId = localStorage.getItem('currentConversationId');
     
-    if (storedConversationId) {
+    if (storedConversationId && !shouldStartNewConversation) {
       // Try to load the stored conversation
       loadConversation(storedConversationId);
     } else {
       // Create a new conversation
       createConversation();
+      setShouldStartNewConversation(false);
     }
-  }, []);
+  }, [shouldStartNewConversation]);
 
   // Helper to format messages for the API - Keep this very simple
   const formatMessagesForAPI = (messages) => {
@@ -180,8 +182,41 @@ const ChatInterface = () => {
   };
   
   // Handle creating a new conversation
-  const handleNewConversation = () => {
-    createConversation();
+  const handleNewConversation = async () => {
+    // First update the current conversation title if it doesn't have one
+    if (conversationId && messages.length > 0) {
+      try {
+        // Generate a title from the first user message
+        const firstUserMessage = messages.find(msg => msg.sender === 'user');
+        let title = firstUserMessage ? firstUserMessage.text : "Untitled Conversation";
+        
+        // Limit title length
+        if (title.length > 50) {
+          title = title.substring(0, 47) + '...';
+        }
+        
+        // Update the conversation
+        await fetch(`${API_ENDPOINT}/conversations/${conversationId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: title,
+          })
+        });
+        
+        console.log(`Updated title for conversation ${conversationId}`);
+      } catch (error) {
+        console.warn('Failed to update conversation title:', error);
+      }
+    }
+    
+    // Set flag to create new conversation on next render cycle
+    setShouldStartNewConversation(true);
+    
+    // Clear messages immediately for better UX
+    setMessages([]);
   };
   
   // Toggle sidebar visibility

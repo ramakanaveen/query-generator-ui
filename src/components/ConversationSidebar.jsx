@@ -1,4 +1,4 @@
-// src/components/ConversationSidebar.jsx
+// src/components/ConversationSidebar.jsx 
 import React, { useState, useEffect } from 'react';
 import './ConversationSidebar.css';
 import * as LucideIcons from 'lucide-react';
@@ -19,33 +19,37 @@ const ConversationSidebar = ({
   
   // Fetch user conversations
   useEffect(() => {
-    const fetchConversations = async () => {
-      if (!userId) return;
-      
-      setIsLoading(true);
-      try {
-        const response = await fetch(`${API_ENDPOINT}/user/${userId}/conversations`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          // Sort by last accessed time
-          const sortedData = data.sort((a, b) => 
-            new Date(b.last_accessed_at) - new Date(a.last_accessed_at)
-          );
-          setConversations(sortedData);
-        } else {
-          setError('Failed to load conversations');
-        }
-      } catch (error) {
-        setError('Error loading conversations');
-        console.error('Error fetching conversations:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     fetchConversations();
-  }, [userId]);
+  }, [userId, currentConversationId]); // Add currentConversationId to dependencies to refresh when it changes
+
+  const fetchConversations = async () => {
+    if (!userId) return;
+    
+    setIsLoading(true);
+    try {
+      console.log(`Fetching conversations for user: ${userId}`);
+      const response = await fetch(`${API_ENDPOINT}/user/${userId}/conversations`);
+      console.log('Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Conversations fetched:', data);
+        
+        // Sort by last accessed time
+        const sortedData = data.sort((a, b) => 
+          new Date(b.last_accessed_at) - new Date(a.last_accessed_at)
+        );
+        setConversations(sortedData);
+      } else {
+        setError('Failed to load conversations');
+      }
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      setError('Error loading conversations');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Filter conversations based on search term
   const filteredConversations = conversations.filter(conv => 
@@ -59,7 +63,14 @@ const ConversationSidebar = ({
   const getConversationTitle = (conversation) => {
     if (conversation.title) return conversation.title;
     
-    // Use first message or a default
+    // Use summary if available
+    if (conversation.summary) {
+      return conversation.summary.length > 40 
+        ? conversation.summary.substring(0, 37) + '...' 
+        : conversation.summary;
+    }
+    
+    // Use first message as fallback
     if (conversation.messages && conversation.messages.length > 0) {
       const firstUserMsg = conversation.messages.find(msg => msg.role === 'user');
       if (firstUserMsg) {
@@ -129,6 +140,7 @@ const ConversationSidebar = ({
               key={conversation.id}
               className={`conversation-item ${conversation.id === currentConversationId ? 'active' : ''}`}
               onClick={() => onConversationSelect(conversation.id)}
+              title={conversation.summary || getConversationTitle(conversation)} // Add title attribute for hover
             >
               <div className="conversation-title">
                 {getConversationTitle(conversation)}
