@@ -16,7 +16,7 @@ import ReactMarkdown from 'react-markdown';
 // API endpoint constants
 const API_ENDPOINT = config.apiUrl;
 
-const Message = ({ message, onRetry }) => {
+const Message = ({ message, onRetry, userId, conversationId }) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [queryResults, setQueryResults] = useState(null);
   const [queryError, setQueryError] = useState(null);
@@ -149,22 +149,43 @@ const Message = ({ message, onRetry }) => {
     }
   };
 
-  const handleFeedback = (type) => {
+  const handleFeedback = async (type) => {
     try {
-      // Prepare feedback data
+      // Prepare common feedback data
       const feedbackData = {
-        queryId: queryId,
-        feedbackType: type,
-        originalText: text || '',
-        originalQuery: query || '',
-        conversationId: window.conversationId || null
+        query_id: queryId,
+        user_id: userId || 'anonymous',
+        original_query: text || '',
+        generated_query: query || '',
+        conversation_id: conversationId || window.conversationId || null,
+        feedback_type: type,
+        timestamp: new Date().toISOString()
       };
       
-      // Record feedback - no server sync for now, just store locally
+      // Record feedback locally
       recordFeedback(queryId, type, feedbackData);
       
-      // If negative feedback, show retry form
-      if (type === 'negative') {
+      // Send to server based on type
+      if (type === 'positive') {
+        // Send positive feedback to server
+        const endpoint = `${API_ENDPOINT}/feedback/positive`;
+        console.log("Sending positive feedback to:", endpoint, feedbackData);
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(feedbackData)
+        });
+        
+        if (!response.ok) {
+          console.warn('Failed to save positive feedback to server:', await response.text());
+        } else {
+          console.log("Positive feedback saved successfully");
+        }
+      } else if (type === 'negative') {
+        // If negative feedback, show retry form
         setShowRetryForm(true);
       }
     } catch (error) {
