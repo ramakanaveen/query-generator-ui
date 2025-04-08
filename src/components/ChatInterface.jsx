@@ -63,12 +63,20 @@ const ChatInterface = () => {
     }
     
     try {
+      const completeMessageData = {
+        id: messageData.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        role: messageData.role,
+        content: messageData.content,
+        // timestamp will default on server
+        // metadata is optional
+      };
+
       const response = await fetch(`${API_ENDPOINT}/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(messageData)
+        body: JSON.stringify(completeMessageData)
       });
       
       if (!response.ok) {
@@ -266,12 +274,14 @@ const ChatInterface = () => {
         if (conversationId) {
           // Save user message - only using minimal required fields
           await saveMessageToConversation({
+            id: userMessage.id,
             role: 'user',
             content: userMessage.text
           });
           
           // Save bot message - only using minimal required fields
           await saveMessageToConversation({
+            id: botMessage.id,
             role: 'assistant',
             content: botMessage.query
           });
