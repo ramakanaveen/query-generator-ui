@@ -5,7 +5,7 @@ import ConversationSidebar from './ConversationSidebar';
 import './ChatInterface.css';
 import config from '../config';
 import * as LucideIcons from 'lucide-react';
-
+import { useAuth } from '../contexts/AuthContext'; 
 // API endpoint constants
 const API_ENDPOINT = config.apiUrl;
 
@@ -18,7 +18,7 @@ const ChatInterface = () => {
   const [showSidebar, setShowSidebar] = useState(true);
   const [isFetchingConversation, setIsFetchingConversation] = useState(false);
   const isInitialized = useRef(false);
-  const userId = 'naveen'; // Use constant instead of state since we don't change it
+  const { userId } = useAuth();
 
   // Helper to format messages for the API
   const formatMessagesForAPI = useCallback((messages) => {
@@ -491,7 +491,7 @@ const ChatInterface = () => {
           <button className="sidebar-toggle" onClick={toggleSidebar}>
             {showSidebar ? <LucideIcons.PanelLeftClose size={20} /> : <LucideIcons.PanelLeftOpen size={20} />}
           </button>
-          <h2>QConnect</h2>
+          <h2>Query Generator</h2>
         </div>
         
         {isFetchingConversation ? (

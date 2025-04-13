@@ -9,14 +9,15 @@ import { createRoot } from 'react-dom/client';
 import QueryResults from './QueryResults';
 import RetryForm from './RetryForm';
 import config from '../config';
-
+import { useAuth } from '../contexts/AuthContext';
 // Import markdown rendering library
 import ReactMarkdown from 'react-markdown';
 
 // API endpoint constants
 const API_ENDPOINT = config.apiUrl;
 
-const Message = ({ message, onRetry, userId, conversationId }) => {
+const Message = ({ message, onRetry, conversationId }) => {
+  const { userId } = useAuth();
   const [isExecuting, setIsExecuting] = useState(false);
   const [queryResults, setQueryResults] = useState(null);
   const [queryError, setQueryError] = useState(null);

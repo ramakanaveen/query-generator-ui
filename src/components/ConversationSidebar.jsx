@@ -2,15 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './ConversationSidebar.css';
 import * as LucideIcons from 'lucide-react';
 import config from '../config';
-
+import { useAuth } from '../contexts/AuthContext';
 const API_ENDPOINT = config.apiUrl;
 
 const ConversationSidebar = ({
-    userId,
     currentConversationId,
     onConversationSelect,
     onNewConversation
 }) => {
+    const { userId } = useAuth();
     const [conversations, setConversations] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
