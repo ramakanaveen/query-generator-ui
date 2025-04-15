@@ -1,0 +1,126 @@
+/* ChartView.css */
+.chart-view {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.5rem;
+  }
+  
+  .chart-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.5rem 0 1rem 0;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 1rem;
+  }
+  
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .control-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #555;
+    white-space: nowrap;
+  }
+  
+  .control-group select {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    background-color: white;
+    min-width: 120px;
+  }
+  
+  .control-group select:focus {
+    outline: none;
+    border-color: #0277bd;
+    box-shadow: 0 0 0 2px rgba(2, 119, 189, 0.1);
+  }
+  
+  .chart-container {
+    flex: 1;
+    min-height: 300px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .empty-chart {
+    text-align: center;
+    color: #666;
+    padding: 2rem;
+  }
+  
+  /* Add responsive styles */
+  @media (max-width: 768px) {
+    .chart-controls {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    
+    .control-group {
+      width: 100%;
+    }
+    
+    .control-group select {
+      flex: 1;
+    }
+    
+    .chart-container {
+      min-height: 250px;
+    }
+  }
+  
+  /* Add styles for tooltips */
+  .recharts-tooltip-wrapper {
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid #ddd;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+  
+  .custom-tooltip {
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid #ddd;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem;
+  }
+  
+  .custom-tooltip .label {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+    color: #333;
+  }
+  
+  /* Add some styles for the color scheme */
+  .chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+  }
+  
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }

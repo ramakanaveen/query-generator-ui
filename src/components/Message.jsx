@@ -23,6 +23,8 @@ const Message = ({ message, onRetry, conversationId }) => {
   const [queryError, setQueryError] = useState(null);
   const [showThinking, setShowThinking] = useState(false);
   const [showRetryForm, setShowRetryForm] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
   const { text, query, thinking, execution_id, sender, timestamp, id, responseType } = message;
   const { directives } = useDirectives();
   const { recordFeedback, getFeedback } = useFeedback();
@@ -93,14 +95,14 @@ const Message = ({ message, onRetry, conversationId }) => {
     }
   };
 
-  const handleExecuteQuery = async () => {
+  const handleExecuteQuery = async (page = currentPage, size = pageSize) => {
     if (!query) return;
     
     setIsExecuting(true);
     setQueryError(null);
     
     try {
-      // Send execute request to server
+      // Send execute request to server with pagination params
       const response = await fetch(`${API_ENDPOINT}/execute`, {
         method: 'POST',
         headers: {
@@ -109,13 +111,29 @@ const Message = ({ message, onRetry, conversationId }) => {
         body: JSON.stringify({
           query: query,
           execution_id: execution_id || `mock-${Date.now()}`,
-          params: {}
+          params: {},
+          pagination: {
+            page,
+            pageSize: size
+          }
         })
       });
       
       if (response.ok) {
         const data = await response.json();
-        setQueryResults(data.results);
+        // Store both the results and pagination information
+        setQueryResults({
+          results: data.results,
+          metadata: data.metadata,
+          pagination: data.pagination || {
+            currentPage: page,
+            totalPages: Math.ceil((data.metadata?.totalRows || data.results.length) / size),
+            totalRows: data.metadata?.totalRows || data.results.length
+          }
+        });
+        
+        // Update current page state
+        setCurrentPage(page);
       } else {
         // If API fails, fallback to mock data
         console.warn("Execute API failed, using mock data");
@@ -129,7 +147,15 @@ const Message = ({ message, onRetry, conversationId }) => {
           { time: "09:45:18", ticker: "TSLA", price: 800.75, quantity: 350 }
         ];
         
-        setQueryResults(mockResults);
+        setQueryResults({
+          results: mockResults,
+          metadata: { totalRows: mockResults.length },
+          pagination: {
+            currentPage: 0,
+            totalPages: 1,
+            totalRows: mockResults.length
+          }
+        });
       }
     } catch (error) {
       console.error('Error executing query:', error);
@@ -144,10 +170,29 @@ const Message = ({ message, onRetry, conversationId }) => {
         { time: "09:45:18", ticker: "TSLA", price: 800.75, quantity: 350 }
       ];
       
-      setQueryResults(mockResults);
+      setQueryResults({
+        results: mockResults,
+        metadata: { error: error.message },
+        pagination: {
+          currentPage: 0,
+          totalPages: 1,
+          totalRows: mockResults.length
+        }
+      });
     } finally {
       setIsExecuting(false);
     }
+  };
+
+  // Add a handler for page changes that includes pageSize
+  const handlePageChange = (newPage, newPageSize = pageSize) => {
+    // Update pageSize if it changed
+    if (newPageSize !== pageSize) {
+      setPageSize(newPageSize);
+    }
+    
+    // Execute the query with new page and page size
+    handleExecuteQuery(newPage, newPageSize);
   };
 
   const handleFeedback = async (type) => {
@@ -252,29 +297,52 @@ const Message = ({ message, onRetry, conversationId }) => {
           
           <div className="query-actions">
             <div className="action-group">
+            <div style={{ padding: '10px', borderTop: '1px solid #e0e0e0', backgroundColor: '#f1f1f1', display: 'flex', gap: '8px' }}>
+              <button 
+                style={{ 
+                  padding: '5px 10px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px', 
+                  backgroundColor: 'white', 
+                  cursor: 'pointer' 
+                }}
+                onClick={handleCopyQuery}
+              >
+                Copy
+              </button>
+              
+              <button 
+                style={{ 
+                  padding: '5px 10px', 
+                  border: '1px solid #0277bd', 
+                  borderRadius: '4px', 
+                  backgroundColor: '#0277bd', 
+                  color: 'white', 
+                  cursor: 'pointer' 
+                }}
+                onClick={() => handleExecuteQuery()}
+                disabled={isExecuting}
+              >
+                {isExecuting ? 'Executing...' : 'Execute'}
+              </button>
+            
+              
               {thinking && thinking.length > 0 && (
                 <button 
-                  onClick={() => setShowThinking(!showThinking)} 
-                  className="action-button thinking-button"
+                  style={{ 
+                    padding: '5px 10px', 
+                    border: '1px solid #6c757d', 
+                    borderRadius: '4px', 
+                    backgroundColor: '#6c757d', 
+                    color: 'white', 
+                    cursor: 'pointer' 
+                  }}
+                  onClick={() => setShowThinking(!showThinking)}
                 >
                   {showThinking ? 'Hide Thinking' : 'Show Thinking'}
                 </button>
               )}
-              
-              <button onClick={handleCopyQuery} className="action-button">
-                Copy
-              </button>
-              
-              {!isSchemaDescription && (
-                <button 
-                  onClick={handleExecuteQuery} 
-                  className={`action-button ${isExecuting ? 'disabled' : ''}`}
-                  disabled={isExecuting}
-                >
-                  {isExecuting ? 'Executing...' : 'Execute'}
-                </button>
-              )}
-              
+              </div>
               {/* Show retry button if negative feedback was given */}
               {existingFeedback === 'negative' && !showRetryForm && (
                 <button 
@@ -337,6 +405,7 @@ const Message = ({ message, onRetry, conversationId }) => {
           results={queryResults} 
           isLoading={isExecuting} 
           error={queryError} 
+          onPageChange={handlePageChange}
         />
       )}
     </div>
