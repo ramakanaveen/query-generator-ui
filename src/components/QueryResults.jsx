@@ -3,13 +3,17 @@ import './QueryResults.css';
 import * as LucideIcons from 'lucide-react';
 import ChartView from './ChartView';
 import { utils as xlsxUtils, writeFile as xlsxWriteFile } from 'xlsx';
-const QueryResults = ({ results, isLoading, error, onPageChange }) => {
+
+const QueryResults = ({ results, isLoading, error }) => {
   // Initialize state
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filters, setFilters] = useState({});
+  const [availableColumns, setAvailableColumns] = useState([]);
   const [visibleColumns, setVisibleColumns] = useState([]);
   const [currentView, setCurrentView] = useState('table');
-  const [pageSize, setPageSize] = useState(100); // Track page size at component level
+  const [currentPage, setCurrentPage] = useState(0);
+  const [localPageSize, setLocalPageSize] = useState(10);
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
 
   // Extract columns and set visible columns on results change
   useEffect(() => {
@@ -17,9 +21,17 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
       const allColumns = Array.from(new Set(
         results.results.flatMap(row => Object.keys(row || {}))
       ));
-      setVisibleColumns(allColumns);
+      setAvailableColumns(allColumns);
+      
+      // Initialize visible columns with all columns if empty
+      if (visibleColumns.length === 0) {
+        setVisibleColumns(allColumns);
+      } else {
+        // Keep only valid columns that exist in the new results
+        setVisibleColumns(prev => prev.filter(col => allColumns.includes(col)));
+      }
     }
-  }, [results]);
+  }, [visibleColumns.length,results]);
   
   if (isLoading) {
     return <div className="query-loading">Executing query...</div>;
@@ -79,12 +91,22 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
     
     return processedResults;
   };
+
+  // Get paginated results for current view
+  const getPaginatedResults = () => {
+    const processed = getProcessedResults();
+    const startIndex = currentPage * localPageSize;
+    const endIndex = startIndex + localPageSize;
+    return processed.slice(startIndex, endIndex);
+  };
   
   const handleFilterChange = (column, value) => {
     setFilters(prev => ({
       ...prev,
       [column]: value
     }));
+    // Reset to first page when filtering
+    setCurrentPage(0);
   };
   
   const handleExportCSV = () => {
@@ -116,11 +138,21 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
     link.click();
     document.body.removeChild(link);
   };
+
   const handleExportExcel = () => {
     const processedResults = getProcessedResults();
     
+    // Create a filtered dataset with only visible columns
+    const filteredData = processedResults.map(row => {
+      const filteredRow = {};
+      visibleColumns.forEach(column => {
+        filteredRow[column] = row[column];
+      });
+      return filteredRow;
+    });
+    
     // Create worksheet from data
-    const worksheet = xlsxUtils.json_to_sheet(processedResults);
+    const worksheet = xlsxUtils.json_to_sheet(filteredData);
     
     // Create workbook and add the worksheet
     const workbook = xlsxUtils.book_new();
@@ -129,6 +161,7 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
     // Generate Excel file and download
     xlsxWriteFile(workbook, `query-results-${Date.now()}.xlsx`);
   };
+  
   const handleColumnToggle = (column) => {
     setVisibleColumns(prev => 
       prev.includes(column) ? 
@@ -137,22 +170,16 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
     );
   };
 
-  // Handle page size change
-  const handlePageSizeChange = (newSize) => {
-    const size = Number(newSize);
-    setPageSize(size);
-    // When changing page size, go back to first page
-    onPageChange(0, size);
+  // Handle local page change
+  const handleLocalPageChange = (newPage) => {
+    setCurrentPage(newPage);
   };
+
+  // Calculate total pages
+  const totalPages = Math.ceil(getProcessedResults().length / localPageSize) || 1;
   
   const processedResults = getProcessedResults();
-
-  // Calculate pagination details
-  const pagination = results.pagination || {
-    currentPage: 0,
-    totalPages: 1,
-    totalRows: processedResults.length
-  };
+  const paginatedResults = getPaginatedResults();
   
   return (
     <div className="query-results">
@@ -164,46 +191,79 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
             onClick={() => setCurrentView('table')}
             title="View as table"
           >
-            <LucideIcons.Table size={16} />
+            <LucideIcons.Table size={20} />
           </button>
           <button 
             className={`action-button ${currentView === 'chart' ? 'active' : ''}`}
             onClick={() => setCurrentView('chart')}
             title="View as chart"
           >
-            <LucideIcons.BarChart size={16} />
+            <LucideIcons.BarChart size={20} />
           </button>
           <button 
             className="action-button" 
             onClick={handleExportCSV}
             title="Export as CSV"
           >
-            <LucideIcons.Download size={16} />
+            <LucideIcons.Download size={20} />
           </button>
           <button 
-              className="action-button" 
-              onClick={handleExportExcel}
-              title="Export as Excel"
-            >
-              <LucideIcons.FileSpreadsheet size={16} />
+            className="action-button" 
+            onClick={handleExportExcel}
+            title="Export as Excel"
+          >
+            <LucideIcons.FileSpreadsheet size={20} />
           </button>
           <div className="column-selector">
-            <button className="action-button" title="Manage columns">
+            <button 
+              className="action-button" 
+              title="Manage columns"
+              onClick={() => setShowColumnSelector(!showColumnSelector)}
+            >
               <LucideIcons.Columns size={16} />
             </button>
-            <div className="column-dropdown">
-              {visibleColumns.map(column => (
-                <div key={column} className="column-option">
-                  <input 
-                    type="checkbox" 
-                    id={`col-${column}`}
-                    checked={visibleColumns.includes(column)}
-                    onChange={() => handleColumnToggle(column)}
-                  />
-                  <label htmlFor={`col-${column}`}>{column}</label>
+            {showColumnSelector && (
+              <div className="column-dropdown">
+                <div className="column-dropdown-header">
+                  <span>Show/Hide Columns</span>
+                  <button 
+                    className="column-dropdown-close"
+                    onClick={() => setShowColumnSelector(false)}
+                  >
+                    <LucideIcons.X size={14} />
+                  </button>
                 </div>
-              ))}
-            </div>
+                <div className="column-options-container">
+                  {availableColumns.map(column => (
+                    <div key={column} className="column-option">
+                      <input 
+                        type="checkbox" 
+                        id={`col-${column}`}
+                        checked={visibleColumns.includes(column)}
+                        onChange={() => handleColumnToggle(column)}
+                      />
+                      <label htmlFor={`col-${column}`}>{column}</label>
+                    </div>
+                  ))}
+                </div>
+                {availableColumns.length > 5 && (
+                  <div className="column-dropdown-actions">
+                    <button 
+                      className="column-action-button"
+                      onClick={() => setVisibleColumns([...availableColumns])}
+                    >
+                      Select All
+                    </button>
+                    <button 
+                      className="column-action-button"
+                      onClick={() => setVisibleColumns([])}
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -224,8 +284,8 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
                       {sortConfig.key === column && (
                         <span className="sort-icon">
                           {sortConfig.direction === 'asc' ? 
-                            <LucideIcons.ChevronUp size={14} /> : 
-                            <LucideIcons.ChevronDown size={14} />}
+                            <LucideIcons.ChevronUp size={16} /> : 
+                            <LucideIcons.ChevronDown size={16} />}
                         </span>
                       )}
                     </div>
@@ -242,7 +302,7 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
               </tr>
             </thead>
             <tbody>
-              {processedResults.map((row, rowIndex) => (
+              {paginatedResults.map((row, rowIndex) => (
                 <tr key={rowIndex}>
                   {visibleColumns.map(column => (
                     <td key={`${rowIndex}-${column}`}>
@@ -258,7 +318,7 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
       
       {currentView === 'chart' && (
         <ChartView 
-          data={processedResults} 
+          data={getProcessedResults()} 
           columns={visibleColumns} 
         />
       )}
@@ -266,18 +326,18 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
       <div className="results-footer">
         <div className="results-pagination">
           <button 
-            disabled={pagination.currentPage === 0}
-            onClick={() => onPageChange(pagination.currentPage - 1, pageSize)}
+            disabled={currentPage === 0}
+            onClick={() => handleLocalPageChange(currentPage - 1)}
             className="pagination-button"
           >
             <LucideIcons.ChevronLeft size={16} />
           </button>
           <span className="pagination-info">
-            Page {pagination.currentPage + 1} of {pagination.totalPages || 1}
+            Page {currentPage + 1} of {totalPages}
           </span>
           <button 
-            disabled={pagination.currentPage >= (pagination.totalPages - 1) || pagination.totalPages <= 1}
-            onClick={() => onPageChange(pagination.currentPage + 1, pageSize)}
+            disabled={currentPage >= totalPages - 1}
+            onClick={() => handleLocalPageChange(currentPage + 1)}
             className="pagination-button"
           >
             <LucideIcons.ChevronRight size={16} />
@@ -286,8 +346,12 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
           <div className="page-size-selector">
             <label>Rows per page:</label>
             <select 
-              value={pageSize} 
-              onChange={(e) => handlePageSizeChange(e.target.value)}
+              value={localPageSize} 
+              onChange={(e) => {
+                const newSize = Number(e.target.value);
+                setLocalPageSize(newSize);
+                setCurrentPage(0); // Reset to first page when changing page size
+              }}
             >
               <option value="10">10</option>
               <option value="25">25</option>
@@ -299,7 +363,7 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
         </div>
         
         <div className="results-metadata">
-          Showing {processedResults.length} of {pagination.totalRows || results.results.length} records 
+          Showing {Math.min(localPageSize, processedResults.length - currentPage * localPageSize)} of {processedResults.length} records 
           {results.metadata?.executionTime ? ` (Execution time: ${results.metadata.executionTime}s)` : ''}
         </div>
       </div>
@@ -307,12 +371,36 @@ const QueryResults = ({ results, isLoading, error, onPageChange }) => {
   );
 };
 
-// Helper function to format different value types
+// Enhanced helper function to format different value types with improved number formatting
 const formatCellValue = (value) => {
   if (value === undefined || value === null) {
     return <span className="empty-value">—</span>;
   }
   
+  // Format numbers with appropriate precision
+  if (typeof value === 'number') {
+    // Integer values (whole numbers)
+    if (Number.isInteger(value)) {
+      return value.toLocaleString();
+    }
+    
+    // Values with decimal places
+    // If more than 4 decimal places, limit to 4
+    if (Math.abs(value) < 0.0001) {
+      // Very small numbers use scientific notation
+      return value.toExponential(4);
+    } else if (String(value).includes('.') && String(value).split('.')[1].length > 4) {
+      return value.toLocaleString(undefined, { 
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4 
+      });
+    }
+    
+    // Otherwise, use locale formatting without fixed precision
+    return value.toLocaleString();
+  }
+  
+  // Handle other types
   if (typeof value === 'object') {
     if (Array.isArray(value)) {
       return `[Array(${value.length})]`;
