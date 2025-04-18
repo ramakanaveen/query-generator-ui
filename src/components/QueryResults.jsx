@@ -318,7 +318,7 @@ const QueryResults = ({ results, isLoading, error }) => {
       
       {currentView === 'chart' && (
         <ChartView 
-          data={getProcessedResults()} 
+          data={processedResults} 
           columns={visibleColumns} 
         />
       )}
