@@ -17,6 +17,14 @@ import ReactMarkdown from 'react-markdown';
 const API_ENDPOINT = config.apiUrl;
 
 const Message = ({ message, onRetry, conversationId }) => {
+  // Add this debug logging right at the start
+  console.log("=== MESSAGE DEBUG ===");
+  console.log("Full message object:", message);
+  console.log("message.text:", message.text);
+  console.log("message.originalUserQuery:", message.originalUserQuery);
+  console.log("message.sender:", message.sender);
+  console.log("====================");
+
   const { userId } = useAuth();
   const [isExecuting, setIsExecuting] = useState(false);
   const [queryResults, setQueryResults] = useState(null);
@@ -197,40 +205,34 @@ const Message = ({ message, onRetry, conversationId }) => {
 
   const handleFeedback = async (type) => {
     try {
+      console.log("=== FEEDBACK DEBUG ===");
+      console.log("message object in handleFeedback:", message);
+      console.log("message.originalUserQuery:", message.originalUserQuery);
+      console.log("message.text:", message.text);
+      console.log("Using originalUserQuery:", message.originalUserQuery || 'FALLBACK: Unknown query');
+      
       // Prepare common feedback data
       const feedbackData = {
         query_id: queryId,
         user_id: userId || 'anonymous',
-        original_query: text.startsWith("Generated KDB/Q query:") ? null : text, // Fix for user message text
+        original_query: message.originalUserQuery || 'Unknown query', // Use the stored original user query
         generated_query: query || '',
         conversation_id: conversationId || window.conversationId || null,
         feedback_type: type,
         timestamp: new Date().toISOString()
       };
       
+      console.log("Final feedback data being sent:", feedbackData);
+      console.log("========================");
+      
       // Record feedback locally
       recordFeedback(queryId, type, feedbackData);
       
       // Send to server based on type
       if (type === 'positive') {
-        // Send positive feedback to server
         const endpoint = `${API_ENDPOINT}/feedback/positive`;
         console.log("Sending positive feedback to:", endpoint, feedbackData);
-        
-        // Look up the original user query from the message list
-        const messages = document.querySelectorAll('.message');
-        let originalUserQuery = null;
-        messages.forEach(msg => {
-          if (msg.querySelector('.sender')?.textContent === 'You') {
-            originalUserQuery = msg.querySelector('.message-content')?.textContent;
-          }
-        });
-  
-        // Update feedbackData with the correct original query
-        if (originalUserQuery) {
-          feedbackData.original_query = originalUserQuery;
-        }
-  
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -258,8 +260,14 @@ const Message = ({ message, onRetry, conversationId }) => {
   };
 
   const handleRetry = (feedbackText) => {
+    console.log("=== RETRY DEBUG ===");
+    console.log("message.originalUserQuery in retry:", message.originalUserQuery);
+    console.log("feedbackText:", feedbackText);
+    console.log("==================");
     if (onRetry) {
-      onRetry(text, query, feedbackText);
+      // Pass the ORIGINAL user query, not the bot's display text
+      const originalUserText = message.originalUserQuery || 'Unknown query';
+      onRetry(originalUserText, query, feedbackText);
     }
     setShowRetryForm(false);
   };

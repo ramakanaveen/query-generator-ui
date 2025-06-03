@@ -42,13 +42,16 @@ const FeedbackProvider = ({ children }) => {
       [queryId]: feedbackType
     }));
 
-    // Create feedback entry
+    // Create feedback entry - USE THE METADATA DIRECTLY, don't override it
     const feedback = {
       query_id: queryId,
       feedback_type: feedbackType,
-      original_text: metadata.originalText || '',
-      original_query: metadata.originalQuery || '',
-      timestamp: new Date().toISOString()
+      // Use the metadata that was passed in, don't override with empty strings
+      original_query: metadata.original_query || '',
+      generated_query: metadata.generated_query || '',
+      user_id: metadata.user_id || '',
+      conversation_id: metadata.conversation_id || '',
+      timestamp: metadata.timestamp || new Date().toISOString()
     };
 
     // Add to pending queue

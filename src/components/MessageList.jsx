@@ -3,7 +3,7 @@ import React from 'react';
 import Message from './Message';
 import './MessageList.css';
 
-const MessageList = ({ messages, onRetry }) => {
+const MessageList = ({ messages, onRetry, conversationId }) => {
   return (
     <div className="message-list">
       {messages.length === 0 ? (
@@ -15,7 +15,8 @@ const MessageList = ({ messages, onRetry }) => {
           <Message 
             key={message.id} 
             message={message} 
-            onRetry={onRetry} 
+            onRetry={onRetry}
+            conversationId={conversationId}
           />
         ))
       )}

@@ -6,6 +6,7 @@ import './ChatInterface.css';
 import config from '../config';
 import * as LucideIcons from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext'; 
+
 // API endpoint constants
 const API_ENDPOINT = config.apiUrl;
 
@@ -98,13 +99,32 @@ const ChatInterface = () => {
         window.conversationId = data.id;
         
         if (data.messages && Array.isArray(data.messages)) {
-          const formattedMessages = data.messages.map(msg => ({
-            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-            text: msg.role === 'user' ? msg.content : 'Generated KDB/Q query:',
-            query: msg.role === 'assistant' ? msg.content : null,
-            sender: msg.role === 'user' ? 'user' : 'bot',
-            timestamp: msg.timestamp || new Date().toISOString()
-          }));
+          const formattedMessages = [];
+          let lastUserMessage = null;
+          
+          data.messages.forEach(msg => {
+            if (msg.role === 'user') {
+              // Store user message to associate with next bot message
+              lastUserMessage = msg.content;
+              formattedMessages.push({
+                id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                text: msg.content,
+                sender: 'user',
+                timestamp: msg.timestamp || new Date().toISOString(),
+                originalUserQuery: undefined // User messages don't need this
+              });
+            } else if (msg.role === 'assistant') {
+              // Bot message - use the last user message as originalUserQuery
+              formattedMessages.push({
+                id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                text: 'Generated KDB/Q query:',
+                query: msg.content,
+                sender: 'bot',
+                timestamp: msg.timestamp || new Date().toISOString(),
+                originalUserQuery: lastUserMessage || 'Unknown query' // Use actual user message
+              });
+            }
+          });
           
           setMessages(formattedMessages);
         }
@@ -312,7 +332,8 @@ const ChatInterface = () => {
           execution_id: data.execution_id,
           sender: 'bot',
           timestamp: new Date().toISOString(),
-          responseType: responseType
+          responseType: responseType,
+          originalUserQuery: text  // Store the original user input
         };
         
         setMessages(prev => [...prev, botMessage]);
@@ -346,6 +367,7 @@ const ChatInterface = () => {
           query: `// Error: ${errorMessage}`,
           sender: 'bot',
           timestamp: new Date().toISOString(),
+          originalUserQuery: text  // Store the original user input
         };
         
         setMessages(prev => [...prev, botMessage]);
@@ -359,6 +381,7 @@ const ChatInterface = () => {
         query: `// Error: ${error.message || 'Network error'}`,
         sender: 'bot',
         timestamp: new Date().toISOString(),
+        originalUserQuery: text  // Store the original user input
       };
       
       setMessages(prev => [...prev, botMessage]);
@@ -423,6 +446,7 @@ const ChatInterface = () => {
           execution_id: data.execution_id,
           sender: 'bot',
           timestamp: new Date().toISOString(),
+          originalUserQuery: originalText  // Use the ORIGINAL user query, not the retry text
         };
         
         setMessages(prev => [...prev, botMessage]);
@@ -454,6 +478,7 @@ const ChatInterface = () => {
           query: `// Error: ${errorMessage}`,
           sender: 'bot',
           timestamp: new Date().toISOString(),
+          originalUserQuery: originalText  // Use the ORIGINAL user query
         };
         
         setMessages(prev => [...prev, botMessage]);
@@ -467,6 +492,7 @@ const ChatInterface = () => {
         query: `// Error generating improved query: ${error.message}`,
         sender: 'bot',
         timestamp: new Date().toISOString(),
+        originalUserQuery: originalText  // Use the ORIGINAL user query
       };
       
       setMessages(prev => [...prev, botMessage]);
@@ -501,7 +527,6 @@ const ChatInterface = () => {
             <MessageList 
               messages={messages} 
               onRetry={handleRetry} 
-              userId={userId}
               conversationId={conversationId}
             />
             <div ref={messageEndRef} />
