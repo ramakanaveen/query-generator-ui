@@ -172,52 +172,89 @@
 .schema-description td {
   white-space: normal;
 }
+
+/* Query actions styling - FIXED */
 .query-actions {
   display: flex;
-  padding: 0.5rem;
+  padding: 0.75rem;
   background-color: #f1f1f1;
-  justify-content: space-between; /* Changed from flex-end to space-between */
+  justify-content: space-between;
   align-items: center;
+  border-top: 1px solid #e0e0e0;
 }
 
 .action-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
+/* Base style for all action buttons */
 .action-button {
   display: flex;
   align-items: center;
-  margin-left: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border: none;
-  background-color: #0277bd;
-  color: white;
+  padding: 0.4rem 0.8rem;
   border-radius: 0.25rem;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid #ddd;
+  background-color: #ffffff;
+  color: #333;
 }
 
-.action-button:hover {
+/* Copy button styling */
+.copy-button {
+  background-color: #f8f9fa;
+}
+
+.copy-button:hover {
+  background-color: #e3f2fd;
+  border-color: #0277bd;
+}
+
+/* Execute button styling */
+.execute-button {
+  background-color: #0277bd;
+  color: white;
+  border-color: #0277bd;
+}
+
+.execute-button:hover {
   background-color: #01579b;
 }
 
-.action-button.disabled {
-  background-color: #ccc !important;
+.execute-button.disabled {
+  background-color: #ccc;
+  border-color: #bbb;
+  color: #666;
   cursor: not-allowed;
+}
+
+/* Thinking button styling */
+.thinking-button {
+  background-color: #6c757d;
+  color: white;
+  border-color: #6c757d;
+}
+
+.thinking-button:hover {
+  background-color: #5a6268;
 }
 
 /* Retry button styling */
 .retry-button {
-  background-color: #ff9800 !important;
+  background-color: #ff9800;
+  color: white;
+  border-color: #ff9800;
   display: flex;
   align-items: center;
   gap: 0.25rem;
 }
 
 .retry-button:hover {
-  background-color: #f57c00 !important;
+  background-color: #f57c00;
 }
 
 .button-icon {
@@ -234,7 +271,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 0.5rem;
   width: 32px;
   height: 32px;
   border: 1px solid #ddd;
@@ -243,6 +279,7 @@
   border-radius: 0.25rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  margin-left: 0.5rem;
 }
 
 .feedback-button:hover:not(:disabled) {
@@ -267,14 +304,6 @@
   border-color: #f44336;
   color: #f44336;
   background-color: rgba(244, 67, 54, 0.1);
-}
-
-.thinking-button {
-  background-color: #6c757d !important;
-}
-
-.thinking-button:hover {
-  background-color: #5a6268 !important;
 }
 
 .thinking-process {
